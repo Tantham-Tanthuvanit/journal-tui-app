@@ -1,17 +1,18 @@
+import os
+
+
 class DataHandler:
-    def __init__(self, filename) -> None:
-        self.filename = filename
+    def __init__(self, directory) -> None:
+        self.directory = directory
 
     def read(self):
-        try:
-            with open(self.filename + ".txt") as f:
-                return f.read()
-        except Exception as e:
-            print("Error reading file: ", e)
+        return os.listdir()
 
-    def write(self, data):
+    def write(self, filename, data):
+        file_path = os.path.join(self.directory, filename + ".txt")
+
         try:
-            with open(self.filename + ".txt", "w") as f:
-                f.write(data)
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write("Empty\n")
         except Exception as e:
-            print("Error reading file: ", e)
+            print(f"Error: {e}")
