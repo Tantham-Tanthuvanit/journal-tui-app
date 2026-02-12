@@ -1,6 +1,7 @@
 import curses
+from lines import h_line
+from curses import panel
 from os import getcwd, listdir
-import re
 from data_handler import DataHandler
 
 
@@ -24,23 +25,28 @@ def main(stdscr):
     on_screen_data = open_data_folder()
 
     while True:
+        stdscr.erase()
+
+        stdscr.box()
+
+        h_line(stdscr, 2)
+
         title_x = int((curses.COLS - len(title)) / 2)
 
-        stdscr.hline(0, 0, curses.ACS_HLINE, curses.COLS)
         stdscr.addstr(1, title_x, title, curses.A_BOLD)
-        stdscr.hline(2, 0, curses.ACS_HLINE, curses.COLS)
 
-        stdscr.hline(curses.LINES - 1, 0, curses.ACS_HLINE, curses.COLS)
-
-        stdscr.hline(curses.LINES - 3, 0, curses.ACS_HLINE, curses.COLS - 1)
+        h_line(stdscr, curses.LINES - 3)
 
         stdscr.addstr(curses.LINES - 2, 1, "[q]uit      [a]dd log")
 
-        stdscr.vline(0, 0, curses.ACS_VLINE, curses.LINES)
-        stdscr.vline(0, curses.COLS - 1, curses.ACS_VLINE, curses.LINES)
-
         for i in range(0, len(on_screen_data)):
-            stdscr.addstr(3 + i, 3, on_screen_data[i][:-4])
+            cur = " "
+            a = curses.A_NORMAL
+            if i == cursor_y:
+                cur = ">"
+                a = curses.A_BOLD
+
+            stdscr.addstr(3 + i, 2, cur + " " + on_screen_data[i][:-4], a)
 
         dataHan = DataHandler("./journals/")
 
@@ -50,21 +56,22 @@ def main(stdscr):
             case "q":
                 break
             case "a":
-                filename = ""
+                filename = popup_input(stdscr, "journal name", "> ")
 
-                while True:
-                    key = stdscr.getch()
+                if filename == None:
+                    pass
+                else:
+                    dataHan.write(filename, "")
 
-                    if key == 10:  # error
-                        break
-                    elif key in (8, 127):
-                        filename = filename[:-1]
-                    elif 32 <= key <= 126:
-                        filename += chr(key)
+            case "j":
+                cursor_y += 1
+                if cursor_y > len(on_screen_data) - 1:
+                    cursor_y = 0
 
-                filename = re.sub(r'[<>:"/\\|?*\n]', "", filename)
-
-                dataHan.write(filename, "")
+            case "k":
+                cursor_y -= 1
+                if cursor_y < 0:
+                    cursor_y = len(on_screen_data) - 1
 
             case _:
                 pass
@@ -75,6 +82,50 @@ def main(stdscr):
 def open_data_folder():
     data_folder_path = "./journals/"
     return listdir(data_folder_path)
+
+
+def popup_input(stdscr, title="Input", prompt="> "):
+    h, w = 6, 50
+    y = (curses.LINES - h) // 2
+    x = (curses.COLS - w) // 2
+
+    win = curses.newwin(h, w, y, x)
+    pan = panel.new_panel(win)
+    pan.top()
+
+    curses.curs_set(1)
+    win.keypad(True)
+
+    text = ""
+
+    while True:
+        win.clear()
+        win.box()
+
+        win.addstr(1, 2, title, curses.A_BOLD)
+        win.addstr(3, 2, prompt + text)
+
+        panel.update_panels()
+        curses.doupdate()
+
+        key = win.getch()
+
+        if key in (10, 13):
+            break
+        elif key in (27,):
+            text = None
+            break
+        elif key in (8, 127, curses.KEY_BACKSPACE):
+            text = text[:-1]
+        elif 32 <= key <= 126:
+            text += chr(key)
+
+    pan.hide()
+    panel.update_panels()
+    curses.doupdate()
+    curses.curs_set(0)
+
+    return text
 
 
 # helps avoid wrong terminal exits and handles all the inits
