@@ -1,8 +1,11 @@
 import curses
+import textwrap
+import data_handler
 from lines import h_line
-from curses import panel
+from curses import KEY_BACKSPACE, panel
 from os import getcwd, listdir
 from data_handler import DataHandler
+import lines
 
 
 # main program
@@ -17,66 +20,82 @@ def main(stdscr):
     curses.start_color()  # anble color text
     curses.curs_set(0)
 
-    cursor_x = 0
+    edit_mode = False
+
     cursor_y = 0
 
     title = "Journal logs"
 
+    num_of_rows_to_display = curses.LINES - 7
+
+    edit_file_title = ""
+
+    title_x = int((curses.COLS - len(title)) / 2)
+
     on_screen_data = open_data_folder()
+
+    dataHan = DataHandler("./journals/")
+
+    to_be_edited = ""
 
     while True:
         stdscr.erase()
-
         stdscr.box()
-
         h_line(stdscr, 2)
-
-        title_x = int((curses.COLS - len(title)) / 2)
-
-        stdscr.addstr(1, title_x, title, curses.A_BOLD)
-
         h_line(stdscr, curses.LINES - 3)
 
+        stdscr.addstr(1, title_x, title, curses.A_BOLD)
         stdscr.addstr(curses.LINES - 2, 1, "[q]uit      [a]dd log")
 
-        for i in range(0, len(on_screen_data)):
-            cur = " "
-            a = curses.A_NORMAL
-            if i == cursor_y:
-                cur = ">"
-                a = curses.A_BOLD
+        if not edit_mode:
+            for i in range(len(on_screen_data)):
+                cur = " "
+                a = curses.A_NORMAL
+                if i == cursor_y:
+                    cur = ">"
+                    a = curses.A_BOLD
 
-            stdscr.addstr(3 + i, 2, cur + " " + on_screen_data[i][:-4], a)
+                stdscr.addstr(3 + i, 2, cur + " " + on_screen_data[i][:-4], a)
 
-        dataHan = DataHandler("./journals/")
+        else:
+            stdscr.addstr(3, 2, edit_file_title, curses.A_BOLD)
+            lines.h_line(stdscr, 4)
 
-        c = stdscr.getkey()
+            max_width = curses.COLS - 4
+            wrapped = textwrap.wrap(to_be_edited, max_width)
 
-        match c:
-            case "q":
+            for i, line in enumerate(wrapped):
+                stdscr.addstr(5 + i, 2, line)
+
+            # stdscr.addstr(5, 2, to_be_edited, curses.A_BOLD)
+
+        stdscr.refresh()  # ← IMPORTANT
+        c = stdscr.getch()  # ← AFTER drawing
+
+        if not edit_mode:
+            if c == ord("\n"):
+                if on_screen_data:
+                    edit_mode = True
+                    edit_file_title = on_screen_data[cursor_y]
+                    to_be_edited = dataHan.read_file(on_screen_data[cursor_y]) or ""
+            elif c == ord("q"):
                 break
-            case "a":
-                filename = popup_input(stdscr, "journal name", "> ")
-
-                if filename == None:
-                    pass
-                else:
-                    dataHan.write(filename, "")
-
-            case "j":
-                cursor_y += 1
-                if cursor_y > len(on_screen_data) - 1:
-                    cursor_y = 0
-
-            case "k":
-                cursor_y -= 1
-                if cursor_y < 0:
-                    cursor_y = len(on_screen_data) - 1
-
-            case _:
-                pass
-
-        on_screen_data = open_data_folder()
+            elif c == ord("e"):
+                popup_input(stdscr, "new file", "> ")
+            elif c == ord("j"):
+                if on_screen_data:
+                    cursor_y = (cursor_y + 1) % len(on_screen_data)
+            elif c == ord("k"):
+                if on_screen_data:
+                    cursor_y = (cursor_y - 1) % len(on_screen_data)
+        else:
+            if c == 10:  # Enter
+                dataHan.write(edit_file_title, to_be_edited)
+                edit_mode = False
+            elif c in (8, 127, curses.KEY_BACKSPACE):
+                to_be_edited = to_be_edited[:-1]
+            elif 32 <= c <= 126:  # printable ASCII
+                to_be_edited += chr(c)
 
 
 def open_data_folder():
